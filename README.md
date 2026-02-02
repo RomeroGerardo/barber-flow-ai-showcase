@@ -60,7 +60,7 @@ SUPABASE_SERVICE_ROLE_KEY=tu_clave_service_role_de_supabase
 # Consigue tu key aquí: https://aistudio.google.com/
 GOOGLE_GENERATIVE_AI_API_KEY=tu_api_key_de_google
 
-# Configuración de Twilio (WhatsApp)
+# Configuración de Twilio (WhatsApp Webhook)
 # Regístrate gratis en: https://www.twilio.com/
 TWILIO_ACCOUNT_SID=tu_account_sid
 TWILIO_AUTH_TOKEN=tu_auth_token
