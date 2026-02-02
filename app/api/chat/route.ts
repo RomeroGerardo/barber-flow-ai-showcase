@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MockBarberAssistant } from '@/lib/ai/mock-assistant';
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase Admin Client
+// Inicializar Cliente de Administración de Supabase
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -13,26 +13,26 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { message, history } = body;
 
-        console.log("Chat Request:", message);
+        console.log("Petición de Chat:", message);
 
         if (!message) {
-            return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+            return NextResponse.json({ error: 'El mensaje es obligatorio' }, { status: 400 });
         }
 
         const assistant = new MockBarberAssistant();
 
-        // Pass history to helper
+        // Pasar historial al asistente
         const response = await assistant.processMessage(message, history || []);
 
         const action = assistant.parseAction(response);
         let finalText = response.replace(/```json[\s\S]*```/, '').trim();
 
-        // EXECUTE ACTION IF PRESENT
+        // EJECUTAR ACCIÓN SI EXISTE
         if (action && action.action === 'book_appointment') {
-            console.log("Executing Booking Action:", action.data);
+            console.log("Ejecutando Acción de Reserva:", action.data);
 
-            // Convert date/time to ISO with fixed -03:00 offset for Argentina/User local time
-            // This ensures 10:00 AM local is stored as 13:00 UTC (or 10:00-03), preventing -3h shift in dashboard
+            // Convertir fecha/hora a ISO con offset fijo de -03:00 para hora local de Argentina
+            // Esto asegura que las 10:00 AM local se guarden como 13:00 UTC (o 10:00-03), evitando desfase de -3h en el dashboard
             const isoDate = `${action.data.date}T${action.data.time}:00-03:00`;
 
             const { data, error } = await supabase.from('appointments').insert([{
@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
             }]);
 
             if (error) {
-                console.error("Booking Error:", error);
+                console.error("Error al Reservar:", error);
                 finalText += "\n\n(Error interno: No se pudo guardar en la base de datos real. Por favor avisa al barbero.)";
             } else {
-                console.log("Booking Success:", data);
+                console.log("Reserva Exitosa:", data);
             }
         }
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error) {
-        console.error('Chat API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('Error en API de Chat:', error);
+        return NextResponse.json({ error: 'Error Interno del Servidor' }, { status: 500 });
     }
 }

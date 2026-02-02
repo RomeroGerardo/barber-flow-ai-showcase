@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Plus, Pencil } from "lucide-react"
+import { Loader2, Plus } from "lucide-react"
 import { useRouter } from 'next/navigation'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner' // Asumiendo que usamos sonner
 
 type Service = {
     id: number
@@ -33,22 +35,19 @@ interface ServiceDialogProps {
 
 export function ServiceDialog({ serviceToEdit, trigger, onSuccess }: ServiceDialogProps) {
     const [open, setOpen] = useState(false)
-    const [loading, setLoading] = useState(false)
     const router = useRouter()
     const supabase = createClient()
+    const queryClient = useQueryClient()
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setLoading(true)
+    // MUTATION: Crear o Actualizar Servicio
+    const mutation = useMutation({
+        mutationFn: async (formData: FormData) => {
+            const data = {
+                name: formData.get('name') as string,
+                price: parseFloat(formData.get('price') as string),
+                duration_minutes: parseInt(formData.get('duration') as string),
+            }
 
-        const formData = new FormData(e.currentTarget)
-        const data = {
-            name: formData.get('name') as string,
-            price: parseFloat(formData.get('price') as string),
-            duration_minutes: parseInt(formData.get('duration') as string),
-        }
-
-        try {
             if (serviceToEdit) {
                 const { error } = await supabase
                     .from('services')
@@ -61,16 +60,25 @@ export function ServiceDialog({ serviceToEdit, trigger, onSuccess }: ServiceDial
                     .insert([data])
                 if (error) throw error
             }
-
+        },
+        onSuccess: () => {
+            const action = serviceToEdit ? "actualizado" : "creado";
+            toast.success(`Servicio ${action} correctamente`)
+            queryClient.invalidateQueries({ queryKey: ['services'] })
             setOpen(false)
             router.refresh()
             if (onSuccess) onSuccess()
-        } catch (error: any) {
+        },
+        onError: (error: any) => {
             console.error('Error saving service:', error)
-            alert(`Error al guardar el servicio: ${error.message || error.error_description || 'Desconocido'}`)
-        } finally {
-            setLoading(false)
+            toast.error(`Error al guardar: ${error.message || 'Desconocido'}`)
         }
+    })
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const formData = new FormData(e.currentTarget)
+        mutation.mutate(formData)
     }
 
     return (
@@ -133,8 +141,8 @@ export function ServiceDialog({ serviceToEdit, trigger, onSuccess }: ServiceDial
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Button type="submit" disabled={mutation.isPending}>
+                            {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Guardar cambios
                         </Button>
                     </DialogFooter>

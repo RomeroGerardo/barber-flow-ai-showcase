@@ -25,6 +25,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner' // Asumiendo que usas sonner o similar para notificaciones
 
 type Service = {
     id: number
@@ -39,46 +41,56 @@ interface ServicesTableProps {
 }
 
 export function ServicesTable({ initialServices }: ServicesTableProps) {
-    const [services, setServices] = useState<Service[]>(initialServices)
-    const [deletingId, setDeletingId] = useState<number | null>(null)
-    const router = useRouter()
     const supabase = createClient()
+    const queryClient = useQueryClient()
+    const router = useRouter() // Mantenemos router para sincronizar servidor si es necesario
+    const [deletingId, setDeletingId] = useState<number | null>(null) // Mantenemos estado local solo para UI inmediata si mutation.isPending no es suficiente granularidad por fila
 
-    // Update local state when dialog saves success (optional if we rely purely on router.refresh)
-    // For simplicity we rely on router.refresh() in the dialog, but we could also update state here.
-    // Actually, router.refresh() re-renders the Server Component, but this is a Client Component.
-    // We should probably pass the new data down or refetch. 
-    // However, simpler approach: The Dialog calls router.refresh(), which updates the page props. 
-    // Wait, initialServices won't update automatically in this client component unless the parent passes new props.
-    // WE NEED: to listen to props updates.
-
-    // Actually, better design: 
-    // Let this component just receive props. When router.refresh() happens in Dialog, the parent (Server Component) re-renders, 
-    // passing new initialServices to this component.
-    // So we should sync state with props.
-    if (initialServices !== services) {
-        setServices(initialServices);
+    // 1. Fetcher para React Query
+    const fetchServices = async () => {
+        const { data, error } = await supabase
+            .from('services')
+            .select('*')
+            .order('name', { ascending: true })
+        if (error) throw error
+        return data as Service[]
     }
+
+    // 2. useQuery hook
+    const { data: services, isLoading, isError } = useQuery({
+        queryKey: ['services'],
+        queryFn: fetchServices,
+        initialData: initialServices, // Hidratación con datos del servidor
+    })
+
+    // 3. Mutation para Eliminar
+    const deleteMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { error } = await supabase.from('services').delete().eq('id', id)
+            if (error) throw error
+        },
+        onSuccess: () => {
+            toast.success("Servicio eliminado correctamente")
+            queryClient.invalidateQueries({ queryKey: ['services'] })
+            router.refresh() // Refrescar componentes de servidor también por si acaso
+        },
+        onError: (error) => {
+            console.error('Error deleting service:', error)
+            toast.error("Error al eliminar el servicio")
+        }
+    })
 
     const handleDelete = async (id: number) => {
         setDeletingId(id)
         try {
-            const { error } = await supabase
-                .from('services')
-                .delete()
-                .eq('id', id)
-
-            if (error) throw error
-
-            setServices(prev => prev.filter(s => s.id !== id))
-            router.refresh()
-        } catch (error) {
-            console.error('Error deleting service:', error)
-            alert('Error al eliminar el servicio')
+            await deleteMutation.mutateAsync(id)
         } finally {
             setDeletingId(null)
         }
     }
+
+    if (isLoading) return <div className="p-4 text-center">Cargando servicios...</div>
+    if (isError) return <div className="p-4 text-center text-red-500">Error al cargar servicios.</div>
 
     return (
         <Table>
@@ -91,14 +103,14 @@ export function ServicesTable({ initialServices }: ServicesTableProps) {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {services.length === 0 ? (
+                {services && services.length === 0 ? (
                     <TableRow>
                         <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
                             No hay servicios registrados.
                         </TableCell>
                     </TableRow>
                 ) : (
-                    services.map((service) => (
+                    services?.map((service) => (
                         <TableRow key={service.id}>
                             <TableCell className="font-medium">{service.name}</TableCell>
                             <TableCell>{service.duration_minutes} min</TableCell>
@@ -116,7 +128,10 @@ export function ServicesTable({ initialServices }: ServicesTableProps) {
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90">
-                                            {deletingId === service.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            {deletingId === service.id || (deleteMutation.isPending && deletingId === service.id) ?
+                                                <Loader2 className="h-4 w-4 animate-spin" /> :
+                                                <Trash2 className="h-4 w-4" />
+                                            }
                                         </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
@@ -128,8 +143,15 @@ export function ServicesTable({ initialServices }: ServicesTableProps) {
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDelete(service.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                                Eliminar
+                                            <AlertDialogAction
+                                                onClick={(e) => {
+                                                    e.preventDefault(); // Evitar cierre inmediato si queremos esperar
+                                                    handleDelete(service.id)
+                                                }}
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                disabled={deleteMutation.isPending}
+                                            >
+                                                {deleteMutation.isPending && deletingId === service.id ? "Eliminando..." : "Eliminar"}
                                             </AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
