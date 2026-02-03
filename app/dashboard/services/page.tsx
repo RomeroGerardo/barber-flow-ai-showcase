@@ -7,6 +7,9 @@ import { ArrowLeft } from 'lucide-react'
 import { ServicesTable } from '@/components/dashboard/services-table'
 import { ServiceDialog } from '@/components/dashboard/service-dialog'
 
+// Forzar renderizado dinámico para evitar errores de prerendering con Supabase
+export const dynamic = 'force-dynamic'
+
 export default async function ServicesPage() {
     const supabase = await createClient()
 

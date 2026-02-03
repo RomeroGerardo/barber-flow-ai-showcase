@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { redirect } from "next/navigation"
 import Link from 'next/link'
 
+// Forzar renderizado dinámico para evitar errores de prerendering con Supabase
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
     const supabase = await createClient()
 

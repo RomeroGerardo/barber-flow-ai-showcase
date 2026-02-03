@@ -1,5 +1,8 @@
 import { WorkingHoursForm } from "@/components/dashboard/working-hours-form"
 
+// Forzar renderizado dinámico para evitar errores de prerendering con Supabase
+export const dynamic = 'force-dynamic'
+
 export default function SettingsPage() {
     return (
         <div className="flex-1 space-y-4 p-8 pt-6">
