@@ -1,14 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { toast } from "sonner" // Assuming sonner or useToast is available, I'll use a generic alert if not sure, but sonner is common in shadcn. I'll fallback to console/alert if needed or check package.json. Actually I'll use standard alert for safety or check for toast component.
-// checking components/ui list earlier: I saw 'toast' not explicitly. I saw 'alert'. 
-// I'll use simple state for now.
 
 export function WorkingHoursForm() {
     const [startTime, setStartTime] = useState("09:00")
@@ -16,12 +13,8 @@ export function WorkingHoursForm() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
-    // Using client-side supabase for this admin form
-    // In a real app we'd use useSupabaseClient or similar context
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // Usar el cliente de Supabase configurado correctamente
+    const supabase = createClient()
 
     useEffect(() => {
         async function loadSettings() {
