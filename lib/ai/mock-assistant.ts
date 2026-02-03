@@ -28,10 +28,12 @@ export class MockBarberAssistant {
      * Permite re-hidratar el estado (útil para WhatsApp / Webhooks sin estado)
      */
     constructor(initialState?: { step: any, collectedData: any }) {
-        this.supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+        // Usar valores placeholder durante el build para evitar errores de prerendering
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
+
+        this.supabase = createClient(supabaseUrl, supabaseKey);
+
         if (initialState) {
             this.step = initialState.step;
             this.collectedData = initialState.collectedData;
