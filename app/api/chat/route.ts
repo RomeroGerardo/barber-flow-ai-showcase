@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MockBarberAssistant } from '@/lib/ai/mock-assistant';
 import { createClient } from "@supabase/supabase-js";
 
-// Inicializar Cliente de Administración de Supabase
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: NextRequest) {
     try {
+        // Inicializar Cliente de Administración de Supabase dentro del handler
+        // Esto evita errores durante el build si las variables de entorno no están disponibles estáticamente
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
         const body = await req.json();
         const { message, history } = body;
 

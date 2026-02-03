@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from "@supabase/supabase-js";
 import { MockBarberAssistant } from '@/lib/ai/mock-assistant';
 
-// Cliente Admin de Supabase
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: NextRequest) {
     try {
+        // Inicializar Supabase dentro del handler para evitar errores de build
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
         // 1. Analizar Datos del Formulario de Twilio
         const formData = await req.formData();
         const incomingMsg = formData.get('Body')?.toString() || '';
