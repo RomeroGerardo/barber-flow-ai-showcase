@@ -4,9 +4,9 @@ export function parseNaturalDate(input: string): { date: string, time: string } 
     const now = new Date();
     let targetDate = new Date(now);
 
-    // Time parsing (simple regex for HH:MM or HHpm)
-    // Matches 10:00, 10:30, 4pm, 4:00pm, 16:00
-    const timeMatch = lower.match(/(\d{1,2})(:(\d{2}))?\s*(am|pm)?/);
+    // Time parsing (simple regex for HH:MM or HHpm or HHhs)
+    // Matches 10:00, 10:30, 4pm, 4:00pm, 16:00, 15hs, 15 hs
+    const timeMatch = lower.match(/(\d{1,2})([:.](\d{2}))?\s*(am|pm|hs)?/);
     let hours = 10;
     let minutes = 0;
 
@@ -17,54 +17,72 @@ export function parseNaturalDate(input: string): { date: string, time: string } 
 
         if (ampm === 'pm' && h < 12) h += 12;
         if (ampm === 'am' && h === 12) h = 0;
+        // "hs" no cambia la hora, se asume formato 24h
 
         if (colonMin) minutes = parseInt(colonMin);
 
         hours = h;
     } else {
-        // Default time if not found? Or return null?
+        // Sin hora especificada, retornar null
         return null;
     }
 
     // Date parsing
     if (lower.includes("hoy")) {
-        // same day
+        // mismo día
     } else if (lower.includes("mañana")) {
         targetDate.setDate(now.getDate() + 1);
     } else {
         // Weekday parsing (lunes, martes...)
-        const days = ['domingo', 'lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado'];
-        const targetDayIndex = days.findIndex(d => lower.includes(d));
+        // Mapeamos nombres de días a sus índices de JavaScript (0=domingo, 1=lunes, ..., 6=sábado)
+        const dayMappings: { [key: string]: number } = {
+            'domingo': 0,
+            'lunes': 1,
+            'martes': 2,
+            'miercoles': 3,
+            'miércoles': 3,
+            'jueves': 4,
+            'viernes': 5,
+            'sabado': 6,
+            'sábado': 6
+        };
+
+        let targetDayIndex = -1;
+        for (const [dayName, dayIndex] of Object.entries(dayMappings)) {
+            if (lower.includes(dayName)) {
+                targetDayIndex = dayIndex;
+                break;
+            }
+        }
 
         if (targetDayIndex !== -1) {
             const currentDay = now.getDay();
             let diff = targetDayIndex - currentDay;
-            if (diff <= 0) diff += 7; // next occurence
+            if (diff <= 0) diff += 7; // próxima ocurrencia
             targetDate.setDate(now.getDate() + diff);
         } else {
-            // Check for explicit numeric date "el 15", "el 3"
+            // Verificar fecha numérica explícita "el 15", "el 3"
             const dateNum = lower.match(/el (\d{1,2})/);
             if (dateNum) {
                 const day = parseInt(dateNum[1]);
-                // Assume current month unless day is in past, then next month
+                // Asumir mes actual, si ya pasó, mes siguiente
                 targetDate.setDate(day);
                 if (targetDate < now) {
                     targetDate.setMonth(targetDate.getMonth() + 1);
                 }
             } else {
-                // Fallback: If no date specified but time is, assume tomorrow if time is passed, or today?
-                // Let's assume explicit date required or default to tomorrow for safety in demo
+                // Fallback: si no hay fecha pero sí hora, asumir mañana para seguridad
                 if (!lower.includes("hoy")) targetDate.setDate(now.getDate() + 1);
             }
         }
     }
 
-    // Format YYYY-MM-DD
+    // Formato YYYY-MM-DD
     const yyyy = targetDate.getFullYear();
     const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
     const dd = String(targetDate.getDate()).padStart(2, '0');
 
-    // Format HH:MM
+    // Formato HH:MM
     const hh = String(hours).padStart(2, '0');
     const min = String(minutes).padStart(2, '0');
 
