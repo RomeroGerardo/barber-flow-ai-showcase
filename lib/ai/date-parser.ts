@@ -1,7 +1,22 @@
+// Zona horaria de Argentina (UTC-3)
+const ARGENTINA_TIMEZONE = 'America/Argentina/Buenos_Aires';
+
+/**
+ * Obtiene la fecha/hora actual en Argentina
+ */
+function getNowInArgentina(): Date {
+    // Crear fecha en UTC y convertir a Argentina
+    const now = new Date();
+    // Obtener el offset de Argentina (-3 horas = -180 minutos)
+    const argentinaOffset = -3 * 60; // -180 minutos
+    const utcOffset = now.getTimezoneOffset(); // minutos desde UTC
+    const diff = argentinaOffset - (-utcOffset); // diferencia en minutos
+    return new Date(now.getTime() + diff * 60 * 1000);
+}
 
 export function parseNaturalDate(input: string): { date: string, time: string } | null {
     const lower = input.toLowerCase();
-    const now = new Date();
+    const now = getNowInArgentina();
     let targetDate = new Date(now);
 
     // Time parsing (simple regex for HH:MM or HHpm or HHhs)

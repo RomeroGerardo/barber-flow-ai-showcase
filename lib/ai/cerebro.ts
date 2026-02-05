@@ -136,7 +136,23 @@ Responde de forma concisa y natural en español.`;
             `${i + 1}. ${s.name} - $${s.price} (${s.duration_minutes} min)`
         ).join('\n');
 
+        // Obtener fecha/hora actual en Argentina
+        const nowArg = new Date();
+        const argentinaOffset = -3 * 60;
+        const utcOffset = nowArg.getTimezoneOffset();
+        const diff = argentinaOffset - (-utcOffset);
+        const argentinaTime = new Date(nowArg.getTime() + diff * 60 * 1000);
+
+        const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+        const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const fechaActual = `${diasSemana[argentinaTime.getDay()]} ${argentinaTime.getDate()} de ${meses[argentinaTime.getMonth()]} de ${argentinaTime.getFullYear()}`;
+        const horaActual = `${String(argentinaTime.getHours()).padStart(2, '0')}:${String(argentinaTime.getMinutes()).padStart(2, '0')}`;
+
         const systemPrompt = `${this.businessContext}
+
+FECHA Y HORA ACTUAL (Argentina, UTC-3):
+- Hoy es: ${fechaActual}
+- Hora actual: ${horaActual}
 
 INFORMACIÓN DEL NEGOCIO:
 - Horario: ${this.workingHours.start} a ${this.workingHours.end}
