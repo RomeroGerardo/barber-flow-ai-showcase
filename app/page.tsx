@@ -4,6 +4,7 @@ import { FeaturesGrid } from "@/components/features-grid";
 import { TechStack } from "@/components/tech-stack";
 import { DemoSection } from "@/components/demo-section";
 import { BookingForm } from "@/components/booking-form";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -37,15 +38,15 @@ export default function Home() {
               Un proyecto de Romero Labs © 2026
             </p>
             <div className="flex gap-6">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+              <Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors text-sm">
                 Contacto
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+              </Link>
+              <Link href="/privacidad" className="text-muted-foreground hover:text-primary transition-colors text-sm">
                 Privacidad
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+              </Link>
+              <Link href="/terminos" className="text-muted-foreground hover:text-primary transition-colors text-sm">
                 Términos
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -53,3 +54,4 @@ export default function Home() {
     </main>
   );
 }
+
