@@ -3,16 +3,37 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Calendar, ArrowRight, Sparkles } from "lucide-react";
+import { BarberFlowLogo } from "@/components/barber-flow-logo";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 py-20">
+    <section className="relative min-h-screen flex flex-col overflow-hidden px-4">
       {/* Background gradient effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-pulse delay-1000" />
 
-      <div className="relative z-10 max-w-7xl mx-auto">
+      {/* Navbar */}
+      <nav className="relative z-20 w-full max-w-7xl mx-auto py-6">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3 group">
+            <BarberFlowLogo className="w-14 h-14 group-hover:scale-105 transition-transform" />
+            <span className="font-semibold text-lg text-foreground">BarberFlow AI</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors text-sm hidden sm:block">
+              Contacto
+            </Link>
+            <Link href="/dashboard">
+              <Button variant="outline" size="sm" className="border-primary/30 hover:bg-primary/10">
+                Dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <div className="relative z-10 max-w-7xl mx-auto flex-1 flex items-center py-12">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left content */}
           <div className="text-center lg:text-left space-y-8">

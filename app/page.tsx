@@ -4,6 +4,7 @@ import { FeaturesGrid } from "@/components/features-grid";
 import { TechStack } from "@/components/tech-stack";
 import { DemoSection } from "@/components/demo-section";
 import { BookingForm } from "@/components/booking-form";
+import { BarberFlowLogo } from "@/components/barber-flow-logo";
 import Link from "next/link";
 
 export default function Home() {
@@ -28,12 +29,10 @@ export default function Home() {
       <footer className="py-12 px-4 border-t border-border">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <span className="text-primary font-bold text-lg">B</span>
-              </div>
+            <Link href="/" className="flex items-center gap-3 group">
+              <BarberFlowLogo className="w-14 h-14 group-hover:scale-105 transition-transform" />
               <span className="font-semibold text-foreground">BarberFlow AI</span>
-            </div>
+            </Link>
             <p className="text-muted-foreground text-sm">
               Un proyecto de Romero Labs © 2026
             </p>
