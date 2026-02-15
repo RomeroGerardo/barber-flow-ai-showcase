@@ -14,7 +14,38 @@ export async function POST(req: NextRequest) {
         // Calculate deposit (30%)
         const depositAmount = Math.round(price * 0.30);
 
+        console.log('Creating preference with body:', JSON.stringify({
+            items: [
+                {
+                    id: appointment_id,
+                    title: `Seña: ${service_name}`,
+                    quantity: 1,
+                    unit_price: depositAmount,
+                    currency_id: 'ARS',
+                },
+            ],
+            payer: {
+                email: client_email || 'test_user@test.com',
+                name: client_name,
+            },
+            back_urls: {
+                success: `${req.nextUrl.origin}/booking/success`,
+                failure: `${req.nextUrl.origin}/booking/failure`,
+                pending: `${req.nextUrl.origin}/booking/pending`,
+            },
+            // auto_return: 'approved',
+            external_reference: appointment_id,
+            notification_url: `${req.nextUrl.origin}/api/webhook/mercadopago`,
+            statement_descriptor: 'BarberFlow',
+            // payment_methods: {
+            //     installments: 1
+            // }
+        }, null, 2));
+
         // Create preference
+        // FORCE RANDOM EMAIL in Sandbox to prevent "Payer is the same as Collector" error
+        const randomEmail = `test_user_${Date.now()}@test.com`;
+
         const result = await preference.create({
             body: {
                 items: [
@@ -27,7 +58,7 @@ export async function POST(req: NextRequest) {
                     },
                 ],
                 payer: {
-                    email: client_email || 'test_user@test.com', // Sandbox requires valid email format
+                    email: randomEmail, // Overriding user email for payment processing
                     name: client_name,
                 },
                 back_urls: {
@@ -39,9 +70,9 @@ export async function POST(req: NextRequest) {
                 external_reference: appointment_id, // Link payment to appointment
                 notification_url: `${req.nextUrl.origin}/api/webhook/mercadopago`, // Must be public URL for MP to reach
                 statement_descriptor: 'BarberFlow',
-                payment_methods: {
-                    installments: 1
-                }
+                // payment_methods: {
+                //     installments: 1
+                // }
             }
         });
 
