@@ -15,6 +15,7 @@ import {
     X,
     Wallet,
     Package,
+    Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -54,6 +55,11 @@ const navItems = [
         title: "Configuración",
         href: "/dashboard/settings",
         icon: Settings,
+    },
+    {
+        title: "IA Config",
+        href: "/dashboard/settings/ai",
+        icon: Bot,
     },
 ];
 

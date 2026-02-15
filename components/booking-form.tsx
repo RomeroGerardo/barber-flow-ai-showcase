@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Checkbox } from "@/components/ui/checkbox"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CalendarIcon, Loader2, CheckCircle2 } from "lucide-react"
@@ -36,6 +37,7 @@ export function BookingForm() {
     const [selectedTime, setSelectedTime] = useState<string | null>(null)
     const [busySlots, setBusySlots] = useState<string[]>([])
     const [loadingAvailability, setLoadingAvailability] = useState(false)
+    const [wantsToDeposit, setWantsToDeposit] = useState(false)
 
     const supabase = createClient()
 
@@ -57,7 +59,6 @@ export function BookingForm() {
             setSelectedTime(null) // Reset selection
             try {
                 // Format date as YYYY-MM-DD for the API (local time)
-                // Warning: simple ISO string might be UTC. We want local date string.
                 const dateString = format(date, 'yyyy-MM-dd')
                 const response = await fetch(`/api/availability?date=${dateString}`)
                 const data = await response.json()
@@ -88,11 +89,6 @@ export function BookingForm() {
             for (let minute = 0; minute < 60; minute += TIME_INTERVAL) {
                 const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 
-                // Check if slot is busy
-                // We compare simply the HH:mm part for now (assuming all bookings are time-zone consistent or UTC normalized)
-                // A more robust way deals with full ISO strings. API returns ISOs.
-                // Let's construct a local date object to compare.
-
                 const slotDate = new Date(date);
                 slotDate.setHours(hour, minute, 0, 0);
 
@@ -100,10 +96,6 @@ export function BookingForm() {
                 if (isToday && slotDate < now) continue;
 
                 // Check against busy slots
-                // busySlots are ISO strings. We verify if any busy slot matches this time.
-                // Note: DB stores UTC. Browser is Local. We need to be careful.
-                // Simplified match: Check if the ISO string of the slot corresponds to any busy ISO.
-                // Actually, simpler: Client side comparison.
                 const isBusy = busySlots.some(busyIso => {
                     const busyDate = new Date(busyIso);
                     return busyDate.getHours() === hour && busyDate.getMinutes() === minute;
@@ -134,35 +126,75 @@ export function BookingForm() {
         const appointmentDate = new Date(date)
         appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
 
-        const data = {
+        const price = selectedService?.price || 0
+        const depositAmount = Math.round(price * 0.30)
+
+        const appointmentData = {
             client_name: formData.get('name'),
             client_phone: formData.get('phone'),
             client_email: formData.get('email'),
             service_type: selectedService?.name || 'Servicio Personalizado',
             notes: formData.get('notes'),
             appointment_date: appointmentDate.toISOString(),
-            status: 'pending',
-            price: selectedService?.price || 0
+            status: wantsToDeposit ? 'pending' : 'confirmed',
+            price: price,
+            payment_status: wantsToDeposit ? 'pending' : 'none',
+            deposit_amount: wantsToDeposit ? depositAmount : 0
         }
 
         try {
-            const { error } = await supabase
+            // 1. Create Appointment
+            const { data: newAppointment, error } = await supabase
                 .from('appointments')
-                .insert([data])
+                .insert([appointmentData])
+                .select()
+                .single()
 
             if (error) throw error
 
-            setSuccess(true)
-            form.reset() // Use captured form
-            setDate(undefined)
-            setSelectedServiceId('')
-            setSelectedTime(null)
+            if (wantsToDeposit && newAppointment) {
+                // 2. Create Payment Preference
+                const response = await fetch('/api/mercadopago/create-preference', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        appointment_id: newAppointment.id,
+                        service_name: appointmentData.service_type,
+                        price: appointmentData.price,
+                        client_email: appointmentData.client_email,
+                        client_name: appointmentData.client_name
+                    })
+                })
+
+                const preference = await response.json()
+
+                if (preference.sandbox_init_point || preference.init_point) {
+                    // Redirect to MercadoPago
+                    window.location.href = preference.sandbox_init_point || preference.init_point
+                    return // Stop execution to allow redirect
+                } else {
+                    console.error('Error creating preference', preference)
+                    // Mostrar error específico del servidor si existe
+                    const errorMessage = preference.error
+                        ? `Error: ${preference.message || preference.error}`
+                        : 'Hubo un error al generar el pago. La cita se guardó pero no se pudo iniciar el pago.';
+
+                    alert(errorMessage);
+                    setSuccess(true)
+                }
+            } else {
+                setSuccess(true)
+                form.reset()
+                setDate(undefined)
+                setSelectedServiceId('')
+                setSelectedTime(null)
+                setWantsToDeposit(false)
+            }
         } catch (error: any) {
             console.error('Error booking:', JSON.stringify(error, null, 2))
-            console.log('Payload attempted:', JSON.stringify(data, null, 2))
             alert(`Error al agendar: ${error.message || JSON.stringify(error) || 'Error desconocido'}`)
         } finally {
-            setLoading(false)
+            if (!wantsToDeposit) setLoading(false)
         }
     }
 
@@ -175,7 +207,7 @@ export function BookingForm() {
                     </div>
                     <h3 className="text-2xl font-bold text-green-700 dark:text-green-400">¡Cita Solicitada!</h3>
                     <p className="text-muted-foreground">
-                        Tu cita ha sido registrada correctamente. Te confirmaremos pronto.
+                        Tu cita ha sido registrada correctamente. Te esperamos.
                     </p>
                     <Button onClick={() => setSuccess(false)} variant="outline">
                         Agendar otra cita
@@ -307,14 +339,32 @@ export function BookingForm() {
                         <Textarea id="notes" name="notes" placeholder="¿Algún detalle especial?" />
                     </div>
 
+                    {selectedService && (
+                        <div className="flex items-center space-x-2 border p-4 rounded-md bg-muted/50">
+                            <Checkbox
+                                id="deposit"
+                                checked={wantsToDeposit}
+                                onCheckedChange={(checked) => setWantsToDeposit(checked as boolean)}
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                                <Label htmlFor="deposit" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Pagar seña del 30% ahora (${Math.round(selectedService.price * 0.3)})
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    (Opcional) Asegura tu turno congelando el precio.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <Button type="submit" className="w-full" disabled={loading || !date || !selectedServiceId || !selectedTime}>
                         {loading ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Agendando...
+                                {wantsToDeposit ? 'Procesando Pago...' : 'Agendando...'}
                             </>
                         ) : (
-                            'Confirmar Reserva'
+                            wantsToDeposit ? 'Ir a Pagar y Reservar' : 'Confirmar Reserva'
                         )}
                     </Button>
                 </form>

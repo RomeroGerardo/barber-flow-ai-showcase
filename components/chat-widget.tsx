@@ -27,6 +27,7 @@ export function ChatWidget() {
     ])
     const [inputValue, setInputValue] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
+    const [conversationState, setConversationState] = React.useState<any>(null)
 
     const scrollRef = React.useRef<HTMLDivElement>(null)
 
@@ -53,7 +54,8 @@ export function ChatWidget() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: userMsg.content,
-                    history: history
+                    history: history,
+                    state: conversationState // Send current state
                 })
             });
 
@@ -62,6 +64,11 @@ export function ChatWidget() {
 
             const botMsg: Message = { role: 'assistant', content: data.response };
             setMessages(prev => [...prev, botMsg]);
+
+            // Update conversation state if returned
+            if (data.state) {
+                setConversationState(data.state);
+            }
 
         } catch (error) {
             console.error(error);
