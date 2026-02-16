@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { CalendarIcon, Loader2, CheckCircle2 } from "lucide-react"
+import { CalendarIcon, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 type Service = {
     id: number
@@ -28,7 +29,11 @@ const OPENING_HOUR = 9; // 9 AM
 const CLOSING_HOUR = 20; // 8 PM
 const TIME_INTERVAL = 30; // 30 minutes
 
-export function BookingForm() {
+interface BookingFormProps {
+    mode?: 'guest' | 'authenticated'
+}
+
+export function BookingForm({ mode = 'authenticated' }: BookingFormProps) {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [date, setDate] = useState<Date>()
@@ -37,18 +42,35 @@ export function BookingForm() {
     const [selectedTime, setSelectedTime] = useState<string | null>(null)
     const [busySlots, setBusySlots] = useState<string[]>([])
     const [loadingAvailability, setLoadingAvailability] = useState(false)
-    const [wantsToDeposit, setWantsToDeposit] = useState(false)
+
+    // Payment State
+    const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit' | 'local'>('full')
+
+    // Auth State (for user_id)
+    const [userId, setUserId] = useState<string | null>(null)
 
     const supabase = createClient()
 
-    // Fetch Services
+    // Fetch Services & User
     useEffect(() => {
-        const fetchServices = async () => {
-            const { data } = await supabase.from('services').select('*').order('price', { ascending: true })
-            if (data) setServices(data)
+        const fetchInitialData = async () => {
+            const { data: servicesData } = await supabase.from('services').select('*').order('price', { ascending: true })
+            if (servicesData) setServices(servicesData)
+
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) setUserId(user.id)
         }
-        fetchServices()
+        fetchInitialData()
     }, [])
+
+    // Set default payment method based on mode
+    useEffect(() => {
+        if (mode === 'guest') {
+            setPaymentMethod('full')
+        } else {
+            setPaymentMethod('local')
+        }
+    }, [mode])
 
     // Fetch Availability when date changes
     useEffect(() => {
@@ -63,7 +85,6 @@ export function BookingForm() {
                 const response = await fetch(`/api/availability?date=${dateString}`)
                 const data = await response.json()
                 if (data.busySlots) {
-                    console.log('Booked Slots (ISO):', data.busySlots)
                     setBusySlots(data.busySlots)
                 }
             } catch (error) {
@@ -88,14 +109,11 @@ export function BookingForm() {
         for (let hour = OPENING_HOUR; hour < CLOSING_HOUR; hour++) {
             for (let minute = 0; minute < 60; minute += TIME_INTERVAL) {
                 const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-
                 const slotDate = new Date(date);
                 slotDate.setHours(hour, minute, 0, 0);
 
-                // Filter past times if it's today
                 if (isToday && slotDate < now) continue;
 
-                // Check against busy slots
                 const isBusy = busySlots.some(busyIso => {
                     const busyDate = new Date(busyIso);
                     return busyDate.getHours() === hour && busyDate.getMinutes() === minute;
@@ -115,11 +133,10 @@ export function BookingForm() {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setLoading(true)
-        const form = e.currentTarget // Capture form reference
-
+        const form = e.currentTarget
         if (!date || !selectedTime) return
 
-        const formData = new FormData(form) // Use captured form
+        const formData = new FormData(form)
 
         // Construct Appointment Date
         const [hours, minutes] = selectedTime.split(':')
@@ -127,7 +144,15 @@ export function BookingForm() {
         appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
 
         const price = selectedService?.price || 0
-        const depositAmount = Math.round(price * 0.30)
+
+        let depositAmount = 0
+        if (paymentMethod === 'deposit') {
+            depositAmount = Math.round(price * 0.30)
+        } else if (paymentMethod === 'full') {
+            depositAmount = price
+        }
+
+        const wantsToPayOnline = paymentMethod === 'deposit' || paymentMethod === 'full'
 
         const appointmentData = {
             client_name: formData.get('name'),
@@ -136,10 +161,11 @@ export function BookingForm() {
             service_type: selectedService?.name || 'Servicio Personalizado',
             notes: formData.get('notes'),
             appointment_date: appointmentDate.toISOString(),
-            status: wantsToDeposit ? 'pending' : 'confirmed',
+            status: wantsToPayOnline ? 'pending' : 'confirmed',
             price: price,
-            payment_status: wantsToDeposit ? 'pending' : 'none',
-            deposit_amount: wantsToDeposit ? depositAmount : 0
+            payment_status: wantsToPayOnline ? 'pending' : 'none',
+            deposit_amount: depositAmount,
+            user_id: userId // Link to user if logged in
         }
 
         try {
@@ -152,7 +178,7 @@ export function BookingForm() {
 
             if (error) throw error
 
-            if (wantsToDeposit && newAppointment) {
+            if (wantsToPayOnline && newAppointment) {
                 // 2. Create Payment Preference
                 const response = await fetch('/api/mercadopago/create-preference', {
                     method: 'POST',
@@ -160,7 +186,7 @@ export function BookingForm() {
                     body: JSON.stringify({
                         appointment_id: newAppointment.id,
                         service_name: appointmentData.service_type,
-                        price: appointmentData.price,
+                        price: depositAmount, // Charge the deposit or full amount
                         client_email: appointmentData.client_email,
                         client_name: appointmentData.client_name
                     })
@@ -173,14 +199,8 @@ export function BookingForm() {
                     window.location.href = preference.sandbox_init_point || preference.init_point
                     return // Stop execution to allow redirect
                 } else {
-                    console.error('Error creating preference', preference)
-                    // Mostrar error específico del servidor si existe
-                    const errorMessage = preference.error
-                        ? `Error: ${preference.message || preference.error}`
-                        : 'Hubo un error al generar el pago. La cita se guardó pero no se pudo iniciar el pago.';
-
-                    alert(errorMessage);
-                    setSuccess(true)
+                    alert('Error al generar el pago. Intenta de nuevo.')
+                    setSuccess(true) // Fallback behavior
                 }
             } else {
                 setSuccess(true)
@@ -188,13 +208,12 @@ export function BookingForm() {
                 setDate(undefined)
                 setSelectedServiceId('')
                 setSelectedTime(null)
-                setWantsToDeposit(false)
             }
         } catch (error: any) {
-            console.error('Error booking:', JSON.stringify(error, null, 2))
-            alert(`Error al agendar: ${error.message || JSON.stringify(error) || 'Error desconocido'}`)
+            console.error('Error booking:', error)
+            alert(`Error al agendar: ${error.message || 'Intente nuevamente'}`)
         } finally {
-            if (!wantsToDeposit) setLoading(false)
+            if (!wantsToPayOnline) setLoading(false)
         }
     }
 
@@ -207,7 +226,7 @@ export function BookingForm() {
                     </div>
                     <h3 className="text-2xl font-bold text-green-700 dark:text-green-400">¡Cita Solicitada!</h3>
                     <p className="text-muted-foreground">
-                        Tu cita ha sido registrada correctamente. Te esperamos.
+                        Tu cita ha sido registrada. {paymentMethod === 'local' ? ' Te esperamos en el local.' : ' Pago procesado correctamente.'}
                     </p>
                     <Button onClick={() => setSuccess(false)} variant="outline">
                         Agendar otra cita
@@ -220,9 +239,11 @@ export function BookingForm() {
     return (
         <Card className="w-full max-w-lg mx-auto">
             <CardHeader>
-                <CardTitle>Reserva tu Cita</CardTitle>
+                <CardTitle>{mode === 'guest' ? 'Reserva Express' : 'Reserva tu Cita'}</CardTitle>
                 <CardDescription>
-                    Completa el formulario para agendar tu próxima visita.
+                    {mode === 'guest'
+                        ? 'Completa tus datos para una reserva rápida. Se requiere pago total.'
+                        : 'Completa el formulario para agendar tu próxima visita.'}
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -235,11 +256,11 @@ export function BookingForm() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="phone">Teléfono</Label>
-                            <Input id="phone" name="phone" type="tel" required placeholder="+54 9 11..." />
+                            <Input id="phone" name="phone" type="tel" required placeholder="+54 9..." />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" name="email" type="email" placeholder="juan@ejemplo.com" />
+                            <Input id="email" name="email" type="email" placeholder="juan@ejemplo.com" required={mode === 'guest'} />
                         </div>
                     </div>
 
@@ -316,7 +337,7 @@ export function BookingForm() {
                                             variant={selectedTime === time ? "default" : "outline"}
                                             className={cn(
                                                 "text-xs",
-                                                !available && "opacity-50 cursor-not-allowed bg-red-100 text-red-900 border-red-200 hover:bg-red-100 hover:text-red-900 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/50"
+                                                !available && "opacity-50 cursor-not-allowed bg-red-100 text-red-900 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/50"
                                             )}
                                             disabled={!available}
                                             onClick={() => setSelectedTime(time)}
@@ -326,7 +347,7 @@ export function BookingForm() {
                                     ))}
                                     {timeSlots.length === 0 && (
                                         <p className="col-span-4 text-center text-sm text-muted-foreground">
-                                            No hay horarios hoy (o ya pasaron).
+                                            No hay horarios hoy.
                                         </p>
                                     )}
                                 </div>
@@ -334,26 +355,49 @@ export function BookingForm() {
                         </div>
                     )}
 
-                    <div className="space-y-2">
-                        <Label htmlFor="notes">Notas Adicionales</Label>
-                        <Textarea id="notes" name="notes" placeholder="¿Algún detalle especial?" />
-                    </div>
-
                     {selectedService && (
-                        <div className="flex items-center space-x-2 border p-4 rounded-md bg-muted/50">
-                            <Checkbox
-                                id="deposit"
-                                checked={wantsToDeposit}
-                                onCheckedChange={(checked) => setWantsToDeposit(checked as boolean)}
-                            />
-                            <div className="grid gap-1.5 leading-none">
-                                <Label htmlFor="deposit" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    Pagar seña del 30% ahora (${Math.round(selectedService.price * 0.3)})
-                                </Label>
-                                <p className="text-xs text-muted-foreground">
-                                    (Opcional) Asegura tu turno congelando el precio.
-                                </p>
-                            </div>
+                        <div className="space-y-3 pt-2">
+                            <Label className="text-base">Método de Pago</Label>
+
+                            {mode === 'guest' ? (
+                                <div className="border p-4 rounded-md bg-amber-500/10 border-amber-500/20 flex gap-3 items-start">
+                                    <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                                    <div>
+                                        <p className="font-semibold text-amber-700 text-sm">Pago Total Requerido</p>
+                                        <p className="text-xs text-amber-600/80">
+                                            Al ser una reserva express sin cuenta, necesitamos el pago del 100% (${selectedService.price}) para confirmar el turno.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <RadioGroup
+                                    value={paymentMethod}
+                                    onValueChange={(val: 'full' | 'deposit' | 'local') => setPaymentMethod(val)}
+                                    className="grid grid-cols-1 gap-3"
+                                >
+                                    <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-muted/50 transition-colors">
+                                        <RadioGroupItem value="local" id="r-local" />
+                                        <Label htmlFor="r-local" className="flex-1 cursor-pointer">
+                                            Pagar en el Local
+                                            <span className="block text-xs text-muted-foreground font-normal">Efectivo o transferencia al llegar</span>
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-muted/50 transition-colors">
+                                        <RadioGroupItem value="deposit" id="r-deposit" />
+                                        <Label htmlFor="r-deposit" className="flex-1 cursor-pointer">
+                                            Seña del 30% (${Math.round(selectedService.price * 0.3)})
+                                            <span className="block text-xs text-muted-foreground font-normal">Congela el precio y asegura tu lugar</span>
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-muted/50 transition-colors">
+                                        <RadioGroupItem value="full" id="r-full" />
+                                        <Label htmlFor="r-full" className="flex-1 cursor-pointer">
+                                            Pago Total Online (${selectedService.price})
+                                            <span className="block text-xs text-muted-foreground font-normal">Despreocúpate de pagar después</span>
+                                        </Label>
+                                    </div>
+                                </RadioGroup>
+                            )}
                         </div>
                     )}
 
@@ -361,10 +405,12 @@ export function BookingForm() {
                         {loading ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {wantsToDeposit ? 'Procesando Pago...' : 'Agendando...'}
+                                Procesando...
                             </>
                         ) : (
-                            wantsToDeposit ? 'Ir a Pagar y Reservar' : 'Confirmar Reserva'
+                            mode === 'guest' || paymentMethod !== 'local'
+                                ? `Ir a Pagar $${paymentMethod === 'deposit' ? Math.round((selectedService?.price || 0) * 0.3) : (selectedService?.price || 0)}`
+                                : 'Confirmar Reserva'
                         )}
                     </Button>
                 </form>
