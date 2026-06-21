@@ -3,8 +3,46 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Romero Labs Dark Theme - BarberFlow AI */
+/* Romero Labs Light Theme - BarberFlow AI */
 :root {
+  --background: #ffffff;
+  --foreground: #020817;
+  --card: #ffffff;
+  --card-foreground: #020817;
+  --popover: #ffffff;
+  --popover-foreground: #020817;
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0d9488;
+  --chart-1: #0d9488;
+  --chart-2: #0891b2;
+  --chart-3: #0284c7;
+  --chart-4: #4f46e5;
+  --chart-5: #7c3aed;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0d9488;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #0d9488;
+  --glow: #0d9488;
+}
+
+/* Romero Labs Dark Theme - BarberFlow AI */
+.dark {
   --background: #0F172A;
   --foreground: #F8FAFC;
   --card: #1E293B;
@@ -29,7 +67,6 @@
   --chart-3: #38BDF8;
   --chart-4: #818CF8;
   --chart-5: #A78BFA;
-  --radius: 0.75rem;
   --sidebar: #1E293B;
   --sidebar-foreground: #F8FAFC;
   --sidebar-primary: #2DD4BF;
